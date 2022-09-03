@@ -11,8 +11,6 @@ using namespace llvm;
 struct PrintPtr : public PassInfoMixin<PrintPtr> {
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &);
     bool runOnBasicBlock(BasicBlock &BB);
-    Function *printf_prototype(LLVMContext &ctx, Module *mod);
-    Constant* geti8StrVal(Module& M, char const* str, Twine const& name);
 };
 
 
@@ -52,7 +50,6 @@ bool PrintPtr::runOnBasicBlock(BasicBlock &BB) {
                 break;
             }
         }
-
     }
 
     return changed;
@@ -66,6 +63,7 @@ PreservedAnalyses PrintPtr::run(Function &F, FunctionAnalysisManager&) {
     }
     return (Changed ? PreservedAnalyses::none() : PreservedAnalyses::all());
 }
+
 
 PassPluginLibraryInfo getPrintPtrPluginInfo() {
     return {LLVM_PLUGIN_API_VERSION, "print-ptr", LLVM_VERSION_STRING,
