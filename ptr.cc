@@ -1,4 +1,3 @@
-#include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -12,29 +11,80 @@ using namespace llvm;
 struct PrintPtr : public PassInfoMixin<PrintPtr> {
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &);
     bool runOnBasicBlock(BasicBlock &BB);
+    Function *printf_prototype(LLVMContext &ctx, Module *mod);
+    Constant* geti8StrVal(Module& M, char const* str, Twine const& name);
 };
+
 
 bool PrintPtr::runOnBasicBlock(BasicBlock &BB) {
     bool changed = false;
 
     for (auto inst = BB.begin(), IE = BB.end(); inst != IE; ++inst) {
+        // Can the instruction read or write memory?
         if (!inst->mayReadOrWriteMemory())
             continue;
         
-        IRBuilder<> Builder(inst);
+        IRBuilder<> Builder(&*inst);
 
-        Use* operandList = inst->getOperandList();
-        unsigned int operandNo = operandList->getOperandNo();
-        for (unsigned int i = 0; i < operandNo; i++) {
-            Value* operand = operandList->get();
+        // iterating the operand (Use) of the instruction
+        for (auto iter = inst->op_begin(), iter_end = inst->op_end(); iter != iter_end; ++iter) {
+            // iter: iterator of Use
+            Value* operand = iter->get();
+
+            // Is the type of operand pointer?
             if (operand->getType()->isPointerTy()) {
-                Value* cmp = Builder.CreateICmpEQ(, ConstantInt::get(, 1));
-                SplitBlockAndInsertIfThenElse(/*cond*/, inst, /*then*/, /*else*/);
+                // TODO: Call printf
+                // TODO: Make if else
+
+                /*
+                // ptr % 2 == 1
+                Value* cmp = Builder.CreateICmpEQ(Builder.CreateURem(operand, Builder.getInt64(2)), Builder.getInt64(1));
+
+                Instruction *ThenTerm = nullptr;
+                Instruction *ElseTerm = nullptr;
+                SplitBlockAndInsertIfThenElse(cmp, inst, &ThenTerm, &ElseTerm);
+
+                Builder.SetInsertPoint(ThenTerm);
+
+                Builder.SetInsertPoint(ElseTerm);
+                */
                 // BB.getInstList().insert(inst, newInst);
                 break;
             }
-
-            operandList = operandList->getNext();
         }
+
     }
+
+    return changed;
+}
+
+PreservedAnalyses PrintPtr::run(Function &F, FunctionAnalysisManager&) {
+    bool Changed = false;
+
+    for (auto &BB : F) {
+        Changed |= runOnBasicBlock(BB);
+    }
+    return (Changed ? PreservedAnalyses::none() : PreservedAnalyses::all());
+}
+
+PassPluginLibraryInfo getPrintPtrPluginInfo() {
+    return {LLVM_PLUGIN_API_VERSION, "print-ptr", LLVM_VERSION_STRING,
+        [](PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](StringRef Name, FunctionPassManager& FPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                    if (Name == "print-ptr") {
+                        FPM.addPass(PrintPtr());
+                        return true;
+                    }
+                    return false;
+                }
+            );
+        }    
+    };
+}
+
+extern "C" LLVM_ATTRIBUTE_WEAK::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo() {
+    return getPrintPtrPluginInfo();
 }
