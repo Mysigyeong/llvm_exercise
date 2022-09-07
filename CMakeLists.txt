@@ -28,5 +28,6 @@ endif()
 #===============================================================================
 # 3. ADD THE TARGET
 #===============================================================================
-add_library(HelloWorld SHARED HelloWorld.cc)
+#add_library(HelloWorld SHARED HelloWorld.cc)
 #add_library(MBASub SHARED MBASub.cc)
+add_library(PrintPtr SHARED ptr.cc)

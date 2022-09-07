@@ -11,6 +11,10 @@ using namespace llvm;
 struct PrintPtr : public PassInfoMixin<PrintPtr> {
     PreservedAnalyses run(Function &F, FunctionAnalysisManager &);
     bool runOnBasicBlock(BasicBlock &BB);
+
+    // This is very important. When clang optimization option is -O0
+    // If I don't specify this function, opt is not executed
+    static bool isRequired(void) { return true; }
 };
 
 
@@ -22,7 +26,10 @@ bool PrintPtr::runOnBasicBlock(BasicBlock &BB) {
         if (!inst->mayReadOrWriteMemory())
             continue;
         
-        IRBuilder<> Builder(&*inst);
+        if (inst->getFunction()->getName().equals("print"))
+            continue;
+
+        //errs() << inst->getOpcodeName() << "\n";
 
         // iterating the operand (Use) of the instruction
         for (auto iter = inst->op_begin(), iter_end = inst->op_end(); iter != iter_end; ++iter) {
@@ -31,7 +38,18 @@ bool PrintPtr::runOnBasicBlock(BasicBlock &BB) {
 
             // Is the type of operand pointer?
             if (operand->getType()->isPointerTy()) {
+                IRBuilder<> Builder(&*inst);
                 // TODO: Call printf
+                Function* printFunc = inst->getModule()->getFunction("print");
+                if (printFunc == nullptr) {
+                    errs() << "can't find print" << "\n";
+                    exit(1);
+                }
+                
+                ArrayRef<Value*> args(operand);
+                Instruction* newInst = CallInst::Create(printFunc, args);
+                BB.getInstList().insert(inst, newInst);
+
                 // TODO: Make if else
 
                 /*
@@ -55,9 +73,8 @@ bool PrintPtr::runOnBasicBlock(BasicBlock &BB) {
     return changed;
 }
 
-PreservedAnalyses PrintPtr::run(Function &F, FunctionAnalysisManager&) {
+PreservedAnalyses PrintPtr::run(Function &F, FunctionAnalysisManager &) {
     bool Changed = false;
-
     for (auto &BB : F) {
         Changed |= runOnBasicBlock(BB);
     }
@@ -66,7 +83,7 @@ PreservedAnalyses PrintPtr::run(Function &F, FunctionAnalysisManager&) {
 
 
 PassPluginLibraryInfo getPrintPtrPluginInfo() {
-    return {LLVM_PLUGIN_API_VERSION, "print-ptr", LLVM_VERSION_STRING,
+    return {LLVM_PLUGIN_API_VERSION, "PrintPtr", LLVM_VERSION_STRING,
         [](PassBuilder &PB) {
             PB.registerPipelineParsingCallback(
                 [](StringRef Name, FunctionPassManager& FPM,
